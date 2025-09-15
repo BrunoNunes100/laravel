@@ -14,5 +14,5 @@ class Post extends Model
         'data',
         'description',
         'picture'
-    ]
+    ];
 }
