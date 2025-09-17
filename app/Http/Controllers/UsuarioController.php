@@ -75,7 +75,7 @@ function fotoUpload(Request $request)
     }
 
     $request->validate([
-        'picture' => 'required|image|mimes:jpg,jpeg,png|max:2048'
+        'picture' => 'required|image|mimes:jpg,jpeg,png|max:10120'
     ]);
 
     try {
