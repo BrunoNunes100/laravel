@@ -13,8 +13,34 @@ class PostController extends Controller
      */
     public function index()
     {
-        //
+        $user = auth()->user();
+    
+        $posts = Post::where('user_id', $user->id)
+            ->orderBy('data', 'desc')
+            ->get();
+    
+        return response()->json($posts);
     }
+
+    public function store(StorePostRequest $request)
+{
+    $user = auth()->user();
+
+    $post = new Post();
+    $post->description = $request->description;
+    $post->data = now();
+    $post->user_id = $user->id;
+
+    if ($request->hasFile('picture')) {
+        $path = $request->file('picture')->store('postagens', 'public');
+        $post->picture = '/storage/' . $path;
+    }
+
+    $post->save();
+
+    return response()->json($post, 201);
+}
+
 
     /**
      * Show the form for creating a new resource.
@@ -26,13 +52,7 @@ class PostController extends Controller
 
     /**
      * Store a newly created resource in storage.
-     */
-    public function store(StorePostRequest $request)
-    {
-        //
-    }
 
-    /**
      * Display the specified resource.
      */
     public function show(Post $post)
