@@ -1,4 +1,3 @@
-// Arquivo: 2025_08_13_191403_create_posts_table.php
 <?php
 
 use Illuminate\Database\Migrations\Migration;
@@ -14,9 +13,11 @@ return new class extends Migration
     {
         Schema::create('posts', function (Blueprint $table) {
             $table->id();
-            $table->string('data', 255); // REMOVA AS ASPAS DO '255'
-            $table->string('description', 255); // REMOVA AS ASPAS DO '255'
-            $table->string('picture', 255); // REMOVA AS ASPAS DO '255'
+            $table->foreignId('user_id')  // adiciona a referência ao usuário
+                  ->constrained()        // cria a foreign key automaticamente apontando para 'users.id'
+                  ->onDelete('cascade'); // se o usuário for deletado, deleta os posts dele
+            $table->string('description', 255);
+            $table->string('picture', 255)->nullable(); // foto pode ser nula
             $table->timestamps();
         });
     }
