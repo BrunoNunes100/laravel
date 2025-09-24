@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers;
 
-
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\File;
 
 class UsuarioController extends Controller
 {
-   
-    function registrar(Request $request) 
+    public function registrar(Request $request) 
     {
         $dados = $request->validate([
             'name' => 'required|string|max:255',
@@ -33,7 +33,7 @@ class UsuarioController extends Controller
         ], 201);
     }
 
-    function login(Request $request)
+    public function login(Request $request)
     {
         $credenciais = $request->validate([
             'email' => 'required|email',
@@ -55,64 +55,62 @@ class UsuarioController extends Controller
         ]);
     }
 
-
-    function logout(Request $request)
+    public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
 
         return response()->json(['message' => 'Logout realizado com sucesso.']);
     }
 
-function fotoUpload(Request $request)
-{
-    // Verifique se o usuário está autenticado
-    $usuario = $request->user();
-    
-    if (!$usuario) {
-        return response()->json([
-            'message' => 'Usuário não autenticado'
-        ], 401);
-    }
-
-    $request->validate([
-        'picture' => 'required|image|mimes:jpg,jpeg,png|max:10120'
-    ]);
-
-    try {
-        // Verifique se o arquivo foi enviado corretamente
-        if (!$request->hasFile('picture')) {
-            return response()->json([
-                'message' => 'Nenhuma imagem foi enviada'
-            ], 400);
-        }
-
-        $file = $request->file('picture');
+    public function fotoUpload(Request $request)
+    {
+        $usuario = $request->user();
         
-        // Verifique se o upload foi bem-sucedido
-        if (!$file->isValid()) {
+        if (!$usuario) {
             return response()->json([
-                'message' => 'Arquivo inválido'
-            ], 400);
+                'message' => 'Usuário não autenticado'
+            ], 401);
         }
 
-        $path = $file->store('pictures', 'public');
-
-        // Atualize o usuário
-        $usuario->update(['picture' => $path]);
-
-        return response()->json([
-            'message' => 'Foto enviada com sucesso.',
-            'picture_url' => asset('storage/' . $path)
+        $request->validate([
+            'picture' => 'required|image|mimes:jpg,jpeg,png|max:10120'
         ]);
 
-    } catch (\Exception $e) {
-        return response()->json([
-            'message' => 'Erro ao fazer upload: ' . $e->getMessage()
-        ], 500);
-    }
-}
+        try {
+            if (!$request->hasFile('picture')) {
+                return response()->json([
+                    'message' => 'Nenhuma imagem foi enviada'
+                ], 400);
+            }
 
-    function desativarConta(Request $request)
+            $file = $request->file('picture');
+            
+            if (!$file->isValid()) {
+                return response()->json([
+                    'message' => 'Arquivo inválido'
+                ], 400);
+            }
+
+            $path = $file->store('pictures', 'public');
+
+            $usuario->update(['picture' => $path]);
+
+            // Chama o método para fixar o storage link sempre que fizer upload da foto
+            $this->fixarStorageLink();
+
+            return response()->json([
+                'message' => 'Foto enviada com sucesso.',
+                'picture_url' => asset('storage/' . $path)
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Erro ao fazer upload: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function desativarConta(Request $request)
     {
         $usuario = $request->user();
         $usuario->update(['enabled' => false, 'status' => 'inactive']);
@@ -120,12 +118,12 @@ function fotoUpload(Request $request)
         return response()->json(['message' => 'Conta desativada com sucesso.']);
     }
 
-    function perfil(Request $request)
+    public function perfil(Request $request)
     {
         return response()->json($request->user());
     }
 
-    function editar(Request $request)
+    public function editar(Request $request)
     {
         $usuario = $request->user();
 
@@ -147,5 +145,60 @@ function fotoUpload(Request $request)
             'message' => 'Dados atualizados com sucesso.',
             'user' => $usuario
         ]);
+    }
+
+    // Novo método para corrigir o storage link no Laravel
+    public function fixarStorageLink()
+    {
+        $storagePath = public_path('storage');
+        $backupPath = public_path('storage_backup');
+        $picturesPath = public_path('storage/pictures');
+
+        $result = [];
+
+        // 1) Veja o que tem dentro de public/storage (se existir)
+        if (File::exists($storagePath)) {
+            $conteudo = File::files($storagePath);
+            $nomes = [];
+            foreach ($conteudo as $arquivo) {
+                $nomes[] = $arquivo->getFilename();
+            }
+            $result['conteudo_storage'] = $nomes;
+        } else {
+            $result['conteudo_storage'] = 'public/storage não existe.';
+        }
+
+        // 2) Se public/storage existir, for diretório e NÃO for symlink
+        if (File::exists($storagePath) && File::isDirectory($storagePath) && !is_link($storagePath)) {
+            $result['acao'] = 'public/storage é diretório e não é symlink. Movendo para storage_backup...';
+
+            if (File::exists($backupPath)) {
+                File::deleteDirectory($backupPath);
+            }
+
+            File::moveDirectory($storagePath, $backupPath);
+        } else {
+            $result['acao'] = 'public/storage já é symlink ou não existe.';
+        }
+
+        // 3) Cria o link simbólico com storage:link
+        Artisan::call('storage:link');
+        $result['artisan_output'] = Artisan::output();
+
+        // 4) Lista últimos 30 arquivos em public/storage/pictures, se existir
+        if (File::exists($picturesPath) && File::isDirectory($picturesPath)) {
+            $todosArquivos = File::files($picturesPath);
+            $ultimosArquivos = array_slice($todosArquivos, max(0, count($todosArquivos) - 30), 30);
+
+            $ultimosNomes = [];
+            foreach ($ultimosArquivos as $arquivo) {
+                $ultimosNomes[] = $arquivo->getFilename();
+            }
+            $result['ultimos_30_pictures'] = $ultimosNomes;
+        } else {
+            $result['ultimos_30_pictures'] = 'public/storage/pictures não existe.';
+        }
+
+        return $result;
     }
 }
