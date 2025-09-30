@@ -19,7 +19,6 @@ Route::middleware('auth:sanctum')->prefix('usuario')->group(function () {
     Route::get('postagens', [PostController::class, 'index']);
 });
 
-Route::get('/fixar-storage', [UsuarioController::class, 'fixarStorageLink']);
 
 Route::post('usuario/login', [UsuarioController::class, 'login']);
 Route::post('usuario/registrar-se', [UsuarioController::class, 'registrar']);
