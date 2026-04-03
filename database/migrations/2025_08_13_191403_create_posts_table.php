@@ -13,10 +13,12 @@ return new class extends Migration
     {
         Schema::create('posts', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('user_id')  // adiciona a referência ao usuário
+                  ->constrained()        // cria a foreign key automaticamente apontando para 'users.id'
+                  ->onDelete('cascade'); // se o usuário for deletado, deleta os posts dele
+            $table->string('description', 255);
+            $table->string('picture', 255)->nullable(); // foto pode ser nula
             $table->timestamps();
-            $table->string('data', '255');
-            $table->string('description', '255');
-            $table->string('picture', '255');
         });
     }
 

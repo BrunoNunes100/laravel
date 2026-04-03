@@ -63,24 +63,54 @@ class UsuarioController extends Controller
         return response()->json(['message' => 'Logout realizado com sucesso.']);
     }
 
+function fotoUpload(Request $request)
+{
+    // Verifique se o usuário está autenticado
+    $usuario = $request->user();
+    
+    if (!$usuario) {
+        return response()->json([
+            'message' => 'Usuário não autenticado'
+        ], 401);
+    }
 
-    function fotoUpload(Request $request)
-    {
-        $request->validate([
-            'picture' => 'required|image|mimes:jpg,jpeg,png|max:2048'
-        ]);
+    $request->validate([
+        'picture' => 'required|image|mimes:jpg,jpeg,png|max:10120'
+    ]);
 
-        $usuario = $request->user();
-        $path = $request->file('picture')->store('pictures', 'public');
+    try {
+        // Verifique se o arquivo foi enviado corretamente
+        if (!$request->hasFile('picture')) {
+            return response()->json([
+                'message' => 'Nenhuma imagem foi enviada'
+            ], 400);
+        }
 
+        $file = $request->file('picture');
+        
+        // Verifique se o upload foi bem-sucedido
+        if (!$file->isValid()) {
+            return response()->json([
+                'message' => 'Arquivo inválido'
+            ], 400);
+        }
+
+        $path = $file->store('pictures', 'public');
+
+        // Atualize o usuário
         $usuario->update(['picture' => $path]);
 
         return response()->json([
             'message' => 'Foto enviada com sucesso.',
             'picture_url' => asset('storage/' . $path)
         ]);
-    }
 
+    } catch (\Exception $e) {
+        return response()->json([
+            'message' => 'Erro ao fazer upload: ' . $e->getMessage()
+        ], 500);
+    }
+}
 
     function desativarConta(Request $request)
     {

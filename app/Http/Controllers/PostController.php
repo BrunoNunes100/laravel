@@ -2,65 +2,64 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use App\Models\Post;
-use App\Http\Requests\StorePostRequest;
-use App\Http\Requests\UpdatePostRequest;
+use Illuminate\Support\Facades\Auth;
 
 class PostController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * Listar todas as postagens do usuário logado
      */
     public function index()
     {
-        //
+        $user = Auth::user();
+        $posts = Post::where('user_id', $user->id)
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(function($post) {
+                return [
+                    'id' => $post->id,
+                    'description' => $post->description,
+                    'picture' => $post->picture ? url('storage/postagens/'.$post->picture) : null,
+                    'data' => $post->created_at,
+                ];
+            });
+
+        return response()->json($posts);
     }
 
     /**
-     * Show the form for creating a new resource.
+     * Criar nova postagem
      */
-    public function create()
+    public function store(Request $request)
     {
-        //
-    }
+        $user = Auth::user();
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(StorePostRequest $request)
-    {
-        //
-    }
+        $request->validate([
+            'description' => 'required|string|max:255',
+            'picture' => 'nullable|image|max:10240', // até 10MB
+        ]);
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(Post $post)
-    {
-        //
-    }
+        $post = new Post();
+        $post->user_id = $user->id;
+        $post->description = $request->input('description');
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(Post $post)
-    {
-        //
-    }
+        if ($request->hasFile('picture')) {
+            $file = $request->file('picture');
+            $filename = time().'_'.$file->getClientOriginalName();
+            $file->storeAs('public/postagens', $filename);
+            $post->picture = $filename;
+        }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(UpdatePostRequest $request, Post $post)
-    {
-        //
-    }
+        $post->save();
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(Post $post)
-    {
-        //
+        return response()->json([
+            'id' => $post->id,
+            'description' => $post->description,
+            'picture' => $post->picture ? url('storage/postagens/'.$post->picture) : null,
+            'data' => $post->created_at,
+        ]);
     }
 }
